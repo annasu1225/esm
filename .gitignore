@@ -2,3 +2,6 @@ esm.egg-info
 cookbook/tutorials
 **/__pycache__/
 **/__init__.py
+# pixi environments
+.pixi
+*.egg-info

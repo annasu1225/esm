@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
+from copy import deepcopy
 from typing import List, Sequence
 
 import attr
@@ -108,7 +109,9 @@ class ESMProtein(ProteinType):
             secondary_structure=None,
             sasa=None,
             function_annotations=None,
-            coordinates=torch.tensor(protein_complex.atom37_positions),
+            coordinates=torch.tensor(
+                protein_complex.atom37_positions, dtype=torch.float32
+            ),
         )
 
     def to_pdb(self, pdb_path: PathOrBuffer) -> None:
@@ -163,6 +166,10 @@ class ESMProtein(ProteinType):
             )
             pred_chains.append(pred_chain)
         return ProteinComplex.from_chains(pred_chains)
+
+    def copy(self) -> "ESMProtein":
+        """Create a deep copy of the ESMProtein instance."""
+        return deepcopy(self)
 
 
 @define
@@ -244,6 +251,10 @@ class ESMProteinTensor(ProteinType):
             ).to(device),
         )
 
+    def copy(self) -> ESMProteinTensor:
+        """Create a deep copy of the ESMProteinTensor instance."""
+        return deepcopy(self)
+
 
 @define
 class ESMProteinError(Exception, ProteinType):
@@ -264,15 +275,16 @@ class GenerationConfig:
     # "random" will unmask a correct number of tokens randomly.
     # "entropy" will unmask the tokens with the lowest logit entropy first.
     strategy: str = attr.field(
-        validator=attr.validators.in_(["random", "entropy"]), default="entropy"
+        validator=attr.validators.in_(["random", "entropy"]), default="random"
     )
-    # Set this to a higher value for better generation results.
+    # Setting default to 20, as there is diminishing return for decoding steps more than 20.
     # Note that this needs to be less than or equal to the sequence length.
-    num_steps: int = 1
+    num_steps: int = 20
     temperature: float = 1.0
-    temperature_annealing: bool = False
+    temperature_annealing: bool = True
     top_p: float = 1.0
     condition_on_coordinates_only: bool = True
+    only_compute_backbone_rmsd: bool = False
 
     def use_entropy_based_unmasking_strategy(self):
         """Use entropy based unmasking strategy during generation."""
@@ -285,6 +297,13 @@ class GenerationConfig:
         self.schedule = "cosine"
         self.strategy = "random"
         self.temperature_annealing = True
+
+
+@define
+class MSA:
+    # Paired MSA sequences.
+    # One would typically compute these using, for example, ColabFold.
+    sequences: list[str]
 
 
 @define
@@ -338,6 +357,11 @@ class ForwardTrackData:
 class LogitsConfig:
     # Logits.
     sequence: bool = False
+
+    # Note that getting logits for tracks other than sequence
+    # are not supported by Forge today, due to their impractical
+    # data sizes.
+    # These are of course supported when running local OSS models.
     structure: bool = False
     secondary_structure: bool = False
     sasa: bool = False
