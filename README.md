@@ -1,6 +1,12 @@
 # ESM
 
-[![Design a GFP](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/evolutionaryscale/esm/blob/main/cookbook/tutorials/4_forge_generate.ipynb)
+<div align="center">
+  <img src="_assets/logo.png" width="50"/>
+
+[ESM3](https://www.science.org/doi/10.1126/science.ads0018) &sdot; [ESM C](https://www.evolutionaryscale.ai/blog/esm-cambrian) &sdot;
+[Slack](https://bit.ly/3FKwcWd) &sdot; [Tutorials](https://github.com/evolutionaryscale/esm/tree/main/cookbook/tutorials) <br>
+</div>
+
 
 - [Installation ](#installation-)
 - [ESM 3](#esm-3-)
@@ -37,7 +43,7 @@ ESM3 is a _generative_ masked language model. You can prompt it with partial seq
 <img src="_assets/esm3_diagram.png" alt="ESM3 Diagram" width="400" />
 
 The ESM3 architecture is highly scalable due to its transformer backbone and all-to-all reasoning over discrete token sequences. At its largest scale, ESM3 was trained with 1.07e24 FLOPs on 2.78 billion proteins and 771 billion unique tokens, and has 98 billion parameters.
-Learn more by reading the [blog post](https://www.evolutionaryscale.ai/blog/esm3-release) and [the pre-print (Hayes et al., 2024)](https://www.evolutionaryscale.ai/papers/esm3-simulating-500-million-years-of-evolution-with-a-language-model).
+Learn more by reading the [blog post](https://www.evolutionaryscale.ai/blog/esm3-release) and [the paper (Hayes et al., 2024)](https://www.science.org/doi/10.1126/science.ads0018).
 
 ESM3-open, with 1.4B parameters, is the smallest and fastest model in the family.
 
@@ -96,6 +102,15 @@ model: ESM3InferenceClient = esm.sdk.client("esm3-medium-2024-08", token="<your 
 
 and the exact same code will work.
 This enables a seamless transition from smaller and faster models, to our largest and most capable protein language models for protein design work.
+
+### Async Forge Client
+The Forge client supports asynchronous API calls for improved performance when making multiple requests. Async methods follow the same naming convention as their synchronous counterparts, with `async_` prepended to the method name. For example:
+
+```py
+model = esm.sdk.client("esm3-medium-2024-08", token="<your forge token>")
+
+protein = await model.async_generate(protein, GenerationConfig(track="sequence"))
+```
 
 ### ESM3 Example Usage
  <a name="esm3-example"></a>
@@ -185,7 +200,7 @@ client =  ESM3ForgeInferenceClient(model="esmc-6b-2024-12", url="https://forge.e
 #     outputs = executor.execute_batch(user_func=<your_function>, **kwargs)
 
 with batch_executor() as executor:
-    outputs = executor.execute_batch(user_func=embed_sequence, model=client, sequence=sequences)
+    outputs = executor.execute_batch(user_func=embed_sequence, client=client, sequence=sequences)
 ```
 
 ### ESM C via SageMaker for Commercial Use  <a name="esm-c-sagemaker"></a>
@@ -247,7 +262,7 @@ The core tenets of our framework are
 - We will adopt risk mitigation strategies and precautionary guardrails
 - We will work with stakeholders in government, policy, and civil society to keep them informed
 
-With this in mind, we have performed a variety of mitigations for `esm3-sm-open-v1`, detailed in our [paper](https://www.evolutionaryscale.ai/papers/esm3-simulating-500-million-years-of-evolution-with-a-language-model)
+With this in mind, we have performed a variety of mitigations for `esm3-sm-open-v1`, detailed in our [paper](https://www.science.org/doi/10.1126/science.ads0018)
 
 ## Licenses  <a name="licenses"></a>
 
@@ -261,10 +276,10 @@ If you use ESM in your work, please cite one of the following:
 @article {hayes2024simulating,
 	author = {Hayes, Thomas and Rao, Roshan and Akin, Halil and Sofroniew, Nicholas J. and Oktay, Deniz and Lin, Zeming and Verkuil, Robert and Tran, Vincent Q. and Deaton, Jonathan and Wiggert, Marius and Badkundri, Rohil and Shafkat, Irhum and Gong, Jun and Derry, Alexander and Molina, Raul S. and Thomas, Neil and Khan, Yousuf A. and Mishra, Chetan and Kim, Carolyn and Bartie, Liam J. and Nemeth, Matthew and Hsu, Patrick D. and Sercu, Tom and Candido, Salvatore and Rives, Alexander},
 	title = {Simulating 500 million years of evolution with a language model},
-	year = {2024},
-	doi = {10.1101/2024.07.01.600583},
-	URL = {https://doi.org/10.1101/2024.07.01.600583},
-	journal = {bioRxiv}
+	year = {2025},
+	doi = {10.1126/science.ads0018},
+	URL = {http://dx.doi.org/10.1126/science.ads0018},
+	journal = {Science}
 }
 ```
 
