@@ -1,6 +1,6 @@
 [project]
 name = "esm"
-version = "3.2.1"
+version = "3.2.3"
 description = "EvolutionaryScale open model repository"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -44,7 +44,6 @@ dependencies = [
   "boto3",
   "pygtrie",
   "dna_features_viewer",
-  "flash-attn @ https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.1/flash_attn-2.8.1+cu12torch2.7cxx11abiFALSE-cp312-cp312-linux_x86_64.whl"
 ]
 # Pytest
 [tool.pytest.ini_options]
