@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import base64
 import pickle
@@ -7,7 +9,6 @@ from typing import Any, Sequence
 import torch
 
 from esm.sdk.api import (
-    MSA,
     ESM3InferenceClient,
     ESMCInferenceClient,
     ESMProtein,
@@ -27,6 +28,7 @@ from esm.sdk.base_forge_client import _BaseForgeInferenceClient
 from esm.sdk.retry import retry_decorator
 from esm.utils.constants.api import MIMETYPE_ES_PICKLE
 from esm.utils.misc import deserialize_tensors, maybe_list, maybe_tensor
+from esm.utils.msa import MSA
 from esm.utils.types import FunctionAnnotation
 
 
@@ -36,10 +38,8 @@ def _list_to_function_annotations(l) -> list[FunctionAnnotation] | None:
     return [FunctionAnnotation(*t) for t in l]
 
 
-def _maybe_logits(data: dict[str, Any], track: str, return_bytes: bool = False):
-    ret = data.get("logits", {}).get(track, None)
-    # TODO(s22chan): just return this when removing return_bytes
-    return ret if ret is None or not return_bytes else maybe_tensor(ret)
+def _maybe_logits(data: dict[str, Any], track: str):
+    return maybe_tensor(data.get("logits", {}).get(track, None))
 
 
 def _maybe_b64_decode(obj, return_bytes: bool):
@@ -119,6 +119,8 @@ class SequenceStructureForgeInferenceClient(_BaseForgeInferenceClient):
         inverse_folding_config = {
             "invalid_ids": config.invalid_ids,
             "temperature": config.temperature,
+            "seed": config.seed,
+            "decode_in_residue_index_order": config.decode_in_residue_index_order,
         }
         request = {
             "coordinates": maybe_list(coordinates, convert_nan_to_none=True),
@@ -137,7 +139,7 @@ class SequenceStructureForgeInferenceClient(_BaseForgeInferenceClient):
         data = await self._async_post(
             "msa", request={}, params={"sequence": sequence, "use_env": False}
         )
-        return MSA(sequences=data["msa"])
+        return MSA.from_sequences(sequences=data["msa"])
 
     def _fetch_msa(self, sequence: str) -> MSA:
         print("Fetching MSA ... this may take a few minutes")
@@ -146,7 +148,7 @@ class SequenceStructureForgeInferenceClient(_BaseForgeInferenceClient):
         data = self._post(
             "msa", request={}, params={"sequence": sequence, "use_env": False}
         )
-        return MSA(sequences=data["msa"])
+        return MSA.from_sequences(sequences=data["msa"])
 
     @retry_decorator
     async def async_fold(
@@ -521,6 +523,7 @@ class ESM3ForgeInferenceClient(ESM3InferenceClient, _BaseForgeInferenceClient):
             sasa=maybe_tensor(data["outputs"]["sasa"]),
             function=maybe_tensor(data["outputs"]["function"]),
             residue_annotations=maybe_tensor(data["outputs"]["residue_annotation"]),
+            potential_sequence_of_concern=data["potential_sequence_of_concern"],
         )
 
     @staticmethod
@@ -602,19 +605,15 @@ class ESM3ForgeInferenceClient(ESM3InferenceClient, _BaseForgeInferenceClient):
 
         return LogitsOutput(
             logits=ForwardTrackData(
-                sequence=_maybe_logits(data, "sequence", return_bytes),
-                structure=_maybe_logits(data, "structure", return_bytes),
-                secondary_structure=_maybe_logits(
-                    data, "secondary_structure", return_bytes
-                ),
-                sasa=_maybe_logits(data, "sasa", return_bytes),
-                function=_maybe_logits(data, "function", return_bytes),
+                sequence=_maybe_logits(data, "sequence"),
+                structure=_maybe_logits(data, "structure"),
+                secondary_structure=_maybe_logits(data, "secondary_structure"),
+                sasa=_maybe_logits(data, "sasa"),
+                function=_maybe_logits(data, "function"),
             ),
             embeddings=maybe_tensor(data["embeddings"]),
             mean_embedding=data["mean_embedding"],
-            residue_annotation_logits=_maybe_logits(
-                data, "residue_annotation", return_bytes
-            ),
+            residue_annotation_logits=_maybe_logits(data, "residue_annotation"),
             hidden_states=maybe_tensor(data["hidden_states"]),
             mean_hidden_state=maybe_tensor(data["mean_hidden_state"]),
         )
@@ -965,6 +964,7 @@ class ESMCForgeInferenceClient(ESMCInferenceClient, _BaseForgeInferenceClient):
             "sequence": config.sequence,
             "return_embeddings": config.return_embeddings,
             "return_mean_embedding": config.return_mean_embedding,
+            "return_mean_hidden_states": config.return_mean_hidden_states,
             "return_hidden_states": config.return_hidden_states,
             "ith_hidden_layer": config.ith_hidden_layer,
         }
@@ -981,12 +981,11 @@ class ESMCForgeInferenceClient(ESMCInferenceClient, _BaseForgeInferenceClient):
         data["hidden_states"] = _maybe_b64_decode(data["hidden_states"], return_bytes)
 
         output = LogitsOutput(
-            logits=ForwardTrackData(
-                sequence=_maybe_logits(data, "sequence", return_bytes)
-            ),
+            logits=ForwardTrackData(sequence=_maybe_logits(data, "sequence")),
             embeddings=maybe_tensor(data["embeddings"]),
             mean_embedding=data["mean_embedding"],
             hidden_states=maybe_tensor(data["hidden_states"]),
+            mean_hidden_state=maybe_tensor(data["mean_hidden_state"]),
         )
         return output
 
@@ -1006,7 +1005,10 @@ class ESMCForgeInferenceClient(ESMCInferenceClient, _BaseForgeInferenceClient):
         except ESMProteinError as e:
             return e
 
-        return ESMProteinTensor(sequence=maybe_tensor(data["outputs"]["sequence"]))
+        return ESMProteinTensor(
+            sequence=maybe_tensor(data["outputs"]["sequence"]),
+            potential_sequence_of_concern=data["potential_sequence_of_concern"],
+        )
 
     @retry_decorator
     def encode(self, input: ESMProtein) -> ESMProteinTensor | ESMProteinError:
@@ -1020,7 +1022,10 @@ class ESMCForgeInferenceClient(ESMCInferenceClient, _BaseForgeInferenceClient):
         except ESMProteinError as e:
             return e
 
-        return ESMProteinTensor(sequence=maybe_tensor(data["outputs"]["sequence"]))
+        return ESMProteinTensor(
+            sequence=maybe_tensor(data["outputs"]["sequence"]),
+            potential_sequence_of_concern=data["potential_sequence_of_concern"],
+        )
 
     @retry_decorator
     async def async_decode(
